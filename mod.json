@@ -1,0 +1,14 @@
+{
+	"geode": "4.6.0",
+	"gd": {
+		"win": "2.2074",
+		"android": "2.2074",
+		"mac": "2.2074",
+		"ios": "2.2074"
+	},
+	"id": "natrium.smart_search",
+	"name": "Smart Search",
+	"version": "v1.0.0",
+	"developer": "Natrium",
+	"description": "Simple QOL mod that improves searching results"
+}
