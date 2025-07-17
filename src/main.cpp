@@ -3,6 +3,7 @@
 using namespace geode::prelude;
 
 #include <Geode/modify/LevelSearchLayer.hpp>
+#include <Geode/modify/ProfilePage.hpp>
 
 class DownloadDelegate : public LevelDownloadDelegate {
 public:
@@ -79,6 +80,14 @@ class $modify(LevelSearchLayer) {
             if (res->ok()) {
                 std::string resString = res->string().unwrapOr("Error");
 
+                log::debug("resString: {}", resString);
+
+                if (resString == "Error" || resString == "-1") {
+                    Notification::create("User does not exist.", NotificationIcon::Warning)->show();
+                    spinner->removeFromParentAndCleanup(true);
+                    return;
+                }
+
                 std::istringstream stream(resString);
                 std::string key, value, accID;
                 while (std::getline(stream, key, ':') && std::getline(stream, value, ':')) {
@@ -101,3 +110,19 @@ class $modify(LevelSearchLayer) {
             });
 	}
 };
+
+// Fix for Android bug, where the "My Levels" page would not load levels correctly until the "My Lists" page was loaded
+#if defined(GEODE_IS_ANDROID)
+
+class $modify(ProfilePage) {
+    void onMyLevels(CCObject * sender) {
+        auto lbl = LevelBrowserLayer::create(GJSearchObject::create(SearchType::UsersLevels, std::to_string(m_score->m_userID)));
+
+        auto scene = CCScene::create();
+        scene->addChild(lbl);
+
+        CCDirector::sharedDirector()->pushScene(CCTransitionFade::create(.5f, scene));
+    }
+};
+
+#endif
