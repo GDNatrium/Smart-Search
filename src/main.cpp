@@ -5,6 +5,73 @@ using namespace geode::prelude;
 #include <Geode/modify/LevelSearchLayer.hpp>
 #include <Geode/modify/ProfilePage.hpp>
 
+// I assume parseListLevels does something similar, but TodoReturn
+std::vector<int> parseList(const std::string& s) {
+    std::vector<int> result;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        result.push_back(numFromString<int>(item).unwrap());
+        
+    }
+    return result;
+}
+
+std::unordered_map<std::string, std::string> parseKeyValue(const std::string& input) {
+    std::unordered_map<std::string, std::string> result;
+    size_t i = 0;
+
+    while (i < input.size()) {
+        size_t key_end = input.find(':', i);
+        if (key_end == std::string::npos) break;
+        std::string key = input.substr(i, key_end - i);
+        i = key_end + 1;
+
+        size_t value_end = input.find(':', i);
+        std::string value;
+        if (value_end == std::string::npos) {
+            value = input.substr(i);
+            i = input.size();
+        }
+        else {
+            value = input.substr(i, value_end - i);
+            i = value_end + 1;
+        }
+
+        result[key] = value;
+    }
+
+    return result;
+}
+
+
+GJLevelList* createList(std::string resString) {
+    auto pos = resString.find('#');
+    std::string firstSegment = (pos == std::string::npos) ? resString : resString.substr(0, pos);
+
+    auto kv = parseKeyValue(firstSegment);
+    auto list = GJLevelList::create();
+
+    if (!kv["1"].empty())  list->m_listID = numFromString<int>(kv["1"]).unwrap();
+    if (!kv["2"].empty())  list->m_listName = kv["2"];
+    if (!kv["3"].empty())  list->m_listDesc = kv["3"];
+    if (!kv["5"].empty())  list->m_listVersion = numFromString<int>(kv["5"]).unwrap();
+    if (!kv["7"].empty())  list->m_difficulty = numFromString<int>(kv["7"]).unwrap();
+    if (!kv["10"].empty()) list->m_downloads = numFromString<int>(kv["10"]).unwrap();
+    if (!kv["14"].empty()) list->m_likes = numFromString<int>(kv["14"]).unwrap();
+    if (!kv["19"].empty()) list->m_featured = numFromString<int>(kv["19"]).unwrapOr(0);
+    if (!kv["28"].empty()) list->m_uploadDate = numFromString<int>(kv["28"]).unwrap();
+    if (!kv["29"].empty()) list->m_updateDate = numFromString<int>(kv["29"]).unwrap();
+    if (!kv["49"].empty()) list->m_accountID = numFromString<int>(kv["49"]).unwrap();
+    if (!kv["50"].empty()) list->m_creatorName = kv["50"];
+    if (!kv["51"].empty()) list->m_levels = parseList(kv["51"]);
+    if (!kv["55"].empty()) list->m_diamonds = numFromString<int>(kv["55"]).unwrap();
+    if (!kv["56"].empty()) list->m_levelsToClaim = numFromString<int>(kv["56"]).unwrap();
+
+    return list;
+}
+
+
 class DownloadDelegate : public LevelDownloadDelegate {
 public:
     static DownloadDelegate* get() {
@@ -42,7 +109,7 @@ public:
 };
 
 class $modify(LevelSearchLayer) {
-	void onSearch(CCObject * sender) {
+    void onSearch(CCObject * sender) {
         auto spinner = LoadingSpinner::create(80);
         spinner->setPosition(CCDirector::sharedDirector()->getWinSize() / 2);
         this->addChild(spinner);
@@ -53,9 +120,49 @@ class $modify(LevelSearchLayer) {
         bool isID = end != std::string::npos && std::all_of(search.begin(), search.begin() + end + 1, ::isdigit);
 
         if (isID) {
-            auto glm = GameLevelManager::get();
-            glm->m_levelDownloadDelegate = DownloadDelegate::get();
-            glm->downloadLevel(std::stoi(search), true);
+            if (m_type == 0) {
+                // Level Search
+                auto glm = GameLevelManager::get();
+                glm->m_levelDownloadDelegate = DownloadDelegate::get();
+                glm->downloadLevel(numFromString<int>(search).unwrap(), true);
+            }
+
+            if (m_type == 1) {
+                // List Search
+                auto req = web::WebRequest()
+                    .userAgent("")
+                    .bodyString(fmt::format("secret=Wmfd2893gb7&str={}&type=0", search));
+
+                auto URL = "http://www.boomlings.com/database/getGJLevelLists.php";
+
+                req.post(URL).listen([this, spinner, sender](auto* res) {
+                    if (res->ok()) {
+                        std::string resString = res->string().unwrapOr("Error");
+
+                        log::debug("resString: {}", resString);
+
+                        if (resString == "Error" || resString == "-1") {
+                            Notification::create("List does not exist.", NotificationIcon::Warning)->show();
+                            spinner->removeFromParentAndCleanup(true);
+                            return;
+                        }
+
+                        spinner->removeFromParentAndCleanup(true);
+
+                        auto list = createList(resString);
+                        auto levelListLayer = LevelListLayer::create(list);
+
+                        auto scene = CCScene::create();
+                        scene->addChild(levelListLayer);
+                        CCDirector::sharedDirector()->pushScene(CCTransitionFade::create(0.5f, scene));
+                    }
+                    else {
+                        Notification::create("List Fetching Failed.", NotificationIcon::Error)->show();
+
+                        LevelSearchLayer::onSearch(sender);
+                    }
+                    });
+            }
         }
         else {
             spinner->removeFromParentAndCleanup(true);
@@ -97,7 +204,7 @@ class $modify(LevelSearchLayer) {
                     }
                 }
 
-                auto userPage = ProfilePage::create(stoi(accID), false);
+                auto userPage = ProfilePage::create(numFromString<int>(accID).unwrap(), false);
                 userPage->show();
 
                 spinner->removeFromParentAndCleanup(true);
