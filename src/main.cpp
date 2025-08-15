@@ -11,6 +11,8 @@ std::vector<int> parseList(const std::string& s) {
     std::stringstream ss(s);
     std::string item;
     while (std::getline(ss, item, ',')) {
+        if (numFromString<int>(item).isErr()) continue;
+
         result.push_back(numFromString<int>(item).unwrap());
         
     }
@@ -52,21 +54,21 @@ GJLevelList* createList(std::string resString) {
     auto kv = parseKeyValue(firstSegment);
     auto list = GJLevelList::create();
 
-    if (!kv["1"].empty())  list->m_listID = numFromString<int>(kv["1"]).unwrap();
+    if (!kv["1"].empty() && numFromString<int>(kv["1"]).isOk())  list->m_listID = numFromString<int>(kv["1"]).unwrap();
     if (!kv["2"].empty())  list->m_listName = kv["2"];
     if (!kv["3"].empty())  list->m_listDesc = kv["3"];
-    if (!kv["5"].empty())  list->m_listVersion = numFromString<int>(kv["5"]).unwrap();
-    if (!kv["7"].empty())  list->m_difficulty = numFromString<int>(kv["7"]).unwrap();
-    if (!kv["10"].empty()) list->m_downloads = numFromString<int>(kv["10"]).unwrap();
-    if (!kv["14"].empty()) list->m_likes = numFromString<int>(kv["14"]).unwrap();
+    if (!kv["5"].empty() && numFromString<int>(kv["5"]).isOk())  list->m_listVersion = numFromString<int>(kv["5"]).unwrap();
+    if (!kv["7"].empty() && numFromString<int>(kv["7"]).isOk())  list->m_difficulty = numFromString<int>(kv["7"]).unwrap();
+    if (!kv["10"].empty() && numFromString<int>(kv["10"]).isOk()) list->m_downloads = numFromString<int>(kv["10"]).unwrap();
+    if (!kv["14"].empty() && numFromString<int>(kv["14"]).isOk()) list->m_likes = numFromString<int>(kv["14"]).unwrap();
     if (!kv["19"].empty()) list->m_featured = numFromString<int>(kv["19"]).unwrapOr(0);
-    if (!kv["28"].empty()) list->m_uploadDate = numFromString<int>(kv["28"]).unwrap();
-    if (!kv["29"].empty()) list->m_updateDate = numFromString<int>(kv["29"]).unwrap();
-    if (!kv["49"].empty()) list->m_accountID = numFromString<int>(kv["49"]).unwrap();
+    if (!kv["28"].empty() && numFromString<int>(kv["28"]).isOk()) list->m_uploadDate = numFromString<int>(kv["28"]).unwrap();
+    if (!kv["29"].empty() && numFromString<int>(kv["29"]).isOk()) list->m_updateDate = numFromString<int>(kv["29"]).unwrap();
+    if (!kv["49"].empty() && numFromString<int>(kv["49"]).isOk()) list->m_accountID = numFromString<int>(kv["49"]).unwrap();
     if (!kv["50"].empty()) list->m_creatorName = kv["50"];
     if (!kv["51"].empty()) list->m_levels = parseList(kv["51"]);
-    if (!kv["55"].empty()) list->m_diamonds = numFromString<int>(kv["55"]).unwrap();
-    if (!kv["56"].empty()) list->m_levelsToClaim = numFromString<int>(kv["56"]).unwrap();
+    if (!kv["55"].empty() && numFromString<int>(kv["55"]).isOk()) list->m_diamonds = numFromString<int>(kv["55"]).unwrap();
+    if (!kv["56"].empty() && numFromString<int>(kv["56"]).isOk()) list->m_levelsToClaim = numFromString<int>(kv["56"]).unwrap();
 
     return list;
 }
@@ -124,7 +126,12 @@ class $modify(LevelSearchLayer) {
                 // Level Search
                 auto glm = GameLevelManager::get();
                 glm->m_levelDownloadDelegate = DownloadDelegate::get();
-                glm->downloadLevel(numFromString<int>(search).unwrap(), true);
+                if (numFromString<int>(search).isOk()) {
+                    glm->downloadLevel(numFromString<int>(search).unwrap(), true);
+                }
+                else {
+                    Notification::create("Something went wrong.", NotificationIcon::Warning)->show();
+                }
             }
 
             if (m_type == 1) {
@@ -204,8 +211,13 @@ class $modify(LevelSearchLayer) {
                     }
                 }
 
-                auto userPage = ProfilePage::create(numFromString<int>(accID).unwrap(), false);
-                userPage->show();
+                if (numFromString<int>(accID).isOk()) {
+                    auto userPage = ProfilePage::create(numFromString<int>(accID).unwrap(), false);
+                    userPage->show();
+                }
+                else {
+                    Notification::create("Something went wrong.", NotificationIcon::Warning)->show();
+                }
 
                 spinner->removeFromParentAndCleanup(true);
             }
